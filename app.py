@@ -30,6 +30,7 @@ def carregar_dados():
             "Codigo_Barras",
             "Produto",
             "Lote",
+            "Quantidade",
             "Validade",
             "Data_Cadastro",
         ]
@@ -44,7 +45,8 @@ st.set_page_config(page_title="Controle de Validade - Cosméticos", layout="wide
 
 st.title("💄 Controle de Validade - Cosméticos")
 st.write(
-    "Sistema de cadastro e alerta de vencimentos para a seção de cosméticos."
+    "Sistema de cadastro, gestão de stock e alerta de vencimentos para a seção"
+    " de cosméticos."
 )
 
 df = carregar_dados()
@@ -54,7 +56,7 @@ aba1, aba2, aba3 = st.tabs(
 )
 
 with aba1:
-  st.subheader("Cadastrar Novo Produto")
+  st.subheader("Cadastrar Novo Produto / Lote")
 
   with st.form("form_cadastro", clear_on_submit=True):
     codigo = st.text_input(
@@ -63,7 +65,14 @@ with aba1:
     nome_produto = st.text_input(
         "Nome do Produto / Marca", placeholder="Ex: Hidratante Natura Tododia"
     )
-    lote = st.text_input("Lote (Opcional)", placeholder="Ex: L1234")
+    col1, col2 = st.columns(2)
+    with col1:
+      lote = st.text_input("Lote", placeholder="Ex: L1234")
+    with col2:
+      quantidade = st.number_input(
+          "Quantidade", min_value=1, value=1, step=1
+      )
+
     validade = st.date_input("Data de Validade")
 
     enviar = st.form_submit_button("Salvar Produto")
@@ -76,6 +85,7 @@ with aba1:
                 "Codigo_Barras": str(codigo),
                 "Produto": nome_produto,
                 "Lote": lote if lote else "N/D",
+                "Quantidade": int(quantidade),
                 "Validade": data_val_str,
                 "Data_Cadastro": str(datetime.now().date()),
             }]
@@ -101,17 +111,18 @@ with aba1:
               f"Novo produto cadastrado em situação crítica:\n\n"
               f"• *{nome_produto}*\n"
               f"  Cód: `{codigo}` | Lote: {lote if lote else 'N/D'}\n"
+              f"  📦 Quantidade: *{quantidade} unidades*\n"
               f"  Validade: {data_val_str} -> {status_txt}"
           )
           enviar_mensagem_telegram(msg_alerta)
           st.success(
-              f"Produto **{nome_produto}** cadastrado e alerta enviado para o"
-              " Telegram com sucesso! 🚀"
+              f"Produto **{nome_produto}** ({quantidade} un.) cadastrado e"
+              " alerta enviado para o Telegram com sucesso! 🚀"
           )
         else:
           st.success(
-              f"Produto **{nome_produto}** cadastrado com sucesso! (Fora do"
-              " prazo de alerta)"
+              f"Produto **{nome_produto}** ({quantidade} un.) cadastrado com"
+              " sucesso! (Fora do prazo de alerta)"
           )
       else:
         st.error(
@@ -164,7 +175,8 @@ with aba3:
 
         st.markdown(
             f"- **{row['Produto']}** (Cód: {row['Codigo_Barras']}) | Lote:"
-            f" {row['Lote']} | Validade: **{row['Validade']}** -> {status}"
+            f" {row['Lote']} | 📦 Qtd: **{row['Quantidade']}** | Validade:"
+            f" **{row['Validade']}** -> {status}"
         )
     else:
       st.success("Tudo em ordem! Nenhum produto vencendo nos próximos 5 dias.")
