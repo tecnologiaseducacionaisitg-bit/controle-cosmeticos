@@ -1,9 +1,24 @@
 from datetime import datetime, timedelta
 import os
 import pandas as pd
+import requests
 import streamlit as st
 
 DB_FILE = "produtos_cosmeticos.csv"
+
+# Definições do Bot do Telegram para envio imediato
+TOKEN = "8443441268:AAE9GOMo1J93Pvt8tuGHvBiHZZFjjodR9-o"
+CHAT_ID = "1344111409"
+
+
+def enviar_mensagem_telegram(mensagem):
+  url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+  payload = {"chat_id": CHAT_ID, "text": mensagem, "parse_mode": "Markdown"}
+  try:
+    response = requests.post(url, json=payload)
+    return response.status_code == 200
+  except Exception:
+    return False
 
 
 def carregar_dados():
@@ -55,20 +70,49 @@ with aba1:
 
     if enviar:
       if codigo and nome_produto:
+        data_val_str = str(validade)
         novo_registro = pd.DataFrame(
             [{
                 "Codigo_Barras": str(codigo),
                 "Produto": nome_produto,
                 "Lote": lote if lote else "N/D",
-                "Validade": str(validade),
+                "Validade": data_val_str,
                 "Data_Cadastro": str(datetime.now().date()),
             }]
         )
         df = pd.concat([df, novo_registro], ignore_index=True)
         salvar_dados(df)
-        st.success(
-            f"Produto **{nome_produto}** cadastrado com sucesso! ✅"
-        )
+
+        # Verificação imediata se vence nos próximos 5 dias ou já venceu
+        hoje = datetime.now().date()
+        validade_dt = datetime.strptime(data_val_str, "%Y-%m-%d").date()
+        dias_restantes = (validade_dt - hoje).days
+
+        if dias_restantes <= 5:
+          if dias_restantes < 0:
+            status_txt = f"🔴 *VENCIDO há {abs(dias_restantes)} dias!*"
+          elif dias_restantes == 0:
+            status_txt = "⚠️ *VENCE HOJE!*"
+          else:
+            status_txt = f"⏳ Vence em *{dias_restantes} dias*"
+
+          msg_alerta = (
+              "🚨 *ALERTA DE VALIDADE IMEDIATO* 🚨\n\n"
+              f"Novo produto cadastrado em situação crítica:\n\n"
+              f"• *{nome_produto}*\n"
+              f"  Cód: `{codigo}` | Lote: {lote if lote else 'N/D'}\n"
+              f"  Validade: {data_val_str} -> {status_txt}"
+          )
+          enviar_mensagem_telegram(msg_alerta)
+          st.success(
+              f"Produto **{nome_produto}** cadastrado e alerta enviado para o"
+              " Telegram com sucesso! 🚀"
+          )
+        else:
+          st.success(
+              f"Produto **{nome_produto}** cadastrado com sucesso! (Fora do"
+              " prazo de alerta)"
+          )
       else:
         st.error(
             "Preencha pelo menos o Código de Barras e o Nome do Produto!"
